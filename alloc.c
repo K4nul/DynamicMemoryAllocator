@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 /*** 요구사항 
  * 1. 구조체 만들기 (header와 footer 읽을 수 있게)
  *  - 구조체 리스트 header 구조체 (footer와 정보는 같음)
@@ -29,6 +30,12 @@
  *  - 각 크기별 free list 구현 
  *  TODO 
  *  - 구현 해야하는 부분 크게 나누기
+ *      - split 함수 
+ *      - 사이즈 별 free list  linked list (not double)
+ *          - 노드 추가 함수 
+ *          - 노드 제거 함수 
+ *          - split시 남은 부분 이동 
+ *          - 검색 함수 
  *  - 구현 해야하는 부분 작게 나누기 세분화 
  *  - 설계 작성
  * allocator 동작 흐름 
@@ -38,17 +45,176 @@
  *  - 할당시 헤더에 사이즈 정보와 할당 여부를 넣는다 (explicit free 시에는 안넣어도 될듯)
 ***/
 
+#define BLOCKSIZE 4
+
+typedef struct freeList
+{
+    size_t size;
+    struct freeList* prevNode;
+    struct freeList* nextNode;
+} ST_FREELIST;
+
+static ST_FREELIST* freeLists;
+// static ST_FREELIST* freeLists[13];
+static int init;
+
 extern void debug(const char *fmt, ...);
 extern void *sbrk(intptr_t increment);
 
 unsigned int max_size;
 
+void split(ST_FREELIST freeList)
+{
+    //split 구현
+
+}
+
+
+
+void addFreeNode(ST_FREELIST* freeNode)
+{
+    ST_FREELIST* currentNode = freeLists;
+    while(1)
+    {
+    
+        if(freeLists->nextNode == NULL)
+        {   
+            freeNode->prevNode = currentNode;
+            freeLists->nextNode = freeNode;
+            return;
+        }
+        if(freeNode < freeLists->nextNode)
+        {
+            freeNode->nextNode = freeLists->nextNode;
+            freeNode->prevNode = freeLists;
+            ST_FREELIST* temp = freeLists->nextNode;
+            freeLists->nextNode->prevNode = freeNode;
+            freeLists->nextNode = freeNode;
+            // 주소값 대입 이후 주소 참조 후 이후 주소의 이전 주소에 freeNode 대입
+            return;
+        }
+
+        currentNode = currentNode->nextNode;
+            
+            
+    }
+    
+    return;
+}
+
+void coalescing(void * p)
+{
+    ST_FREELIST* tempPtr = (ST_FREELIST*)p;
+    ST_FREELIST * current = p-4;
+    ST_FREELIST * prev = current-4; //HEADERLENGTH
+    ST_FREELIST * next = current+(current->size&-2);
+    size_t nextAllocatedFlag = next->size&=1;
+    size_t prevAllocatedFlag = prev->size&=1;
+    if( nextAllocatedFlag== 0){
+        current->nextNode = next->nextNode;
+        current->prevNode = next->prevNode;
+        current->size = current->size&-2 + next->size&-2;
+
+    }
+    if( prevAllocatedFlag== 0)
+    {   
+        if(nextAllocatedFlag== 0)
+        {
+            prev->nextNode = current->nextNode;
+            prev->nextNode = current->prevNode;
+        }
+        
+        addFreeNode(prev);
+    }else
+    {
+        addFreeNode(current);
+    }
+
+
+}
+
+void* allocateFreeList(size_t blockSize)
+{
+
+    //allocate할때 sbrk 혹은 freenode에서 추가 
+    //
+    if(freeLists->size == 0)
+        return sbrk(blockSize);
+
+    ST_FREELIST* current = freeLists;
+
+    while(1)
+    {
+        if(blockSize < current->size)
+        {
+            
+            ST_FREELIST* tempPrev = current->prevNode;
+            ST_FREELIST* tempNext = current->nextNode;
+            size_t tempSize = current->size - blockSize;
+            size_t* temp = current;
+            *temp = blockSize+1;
+            temp+= blockSize-4;
+            *temp = blockSize+1;
+
+            ST_FREELIST* freeNode = temp+4;
+            
+            freeNode->prevNode = tempPrev;
+            freeNode->nextNode = tempNext;
+            
+            return current+4;
+        }
+        if(blockSize = current->size)
+        {
+            current->nextNode->prevNode = current->prevNode;
+            current->prevNode->nextNode = current->nextNode;
+
+            size_t* temp = current;
+            *temp = blockSize+1;
+            temp+= blockSize-4;
+            *temp = blockSize+1;
+            return current+4;
+        }
+
+        current = current->nextNode;
+    }
+
+
+}
+
+void allocatorInit()
+{
+
+    
+    init = 1;
+
+    freeLists = sbrk(20);    
+    freeLists->nextNode = NULL;
+    freeLists->prevNode = NULL;
+    freeLists->size = 0; 
+    
+}
+
 void *myalloc(size_t size)
 {
-    void *p = sbrk(size);
-    debug("alloc(%u): %p\n", (unsigned int)size, p);
+    if (size == 0)
+        return 0;
+
+    if(init == 0)
+        allocatorInit();
+                
+    size_t blockSize = size * BLOCKSIZE;
+    blockSize += 8;
+
+    //freeList에서 확인 이후 없으면 sbrk 확인은 어떻게?
+    void *p = allocateFreeList(size);
+
+
+    int * memSize = p;
+    *memSize = blockSize;
+    debug("alloc(%u): %p\n", (unsigned int)size, p+BLOCKSIZE);
     max_size += size;
     debug("max: %u\n", max_size);
+
     return p;
 }
 
@@ -69,5 +235,7 @@ void *myrealloc(void *ptr, size_t size)
 
 void myfree(void *ptr)
 {
+    coalescing(ptr);
+
     debug("free(%p)\n", ptr);
 }
