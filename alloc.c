@@ -56,7 +56,7 @@ typedef struct freeList
 
 static ST_FREELIST* freeLists;
 // static ST_FREELIST* freeLists[13];
-static int init;
+static int init=0;
 
 extern void debug(const char *fmt, ...);
 extern void *sbrk(intptr_t increment);
@@ -73,6 +73,8 @@ void split(ST_FREELIST freeList)
 
 void addFreeNode(ST_FREELIST* freeNode)
 {
+
+    debug("addFreeNode\n");    
     ST_FREELIST* currentNode = freeLists;
     while(1)
     {
@@ -90,7 +92,6 @@ void addFreeNode(ST_FREELIST* freeNode)
             ST_FREELIST* temp = freeLists->nextNode;
             freeLists->nextNode->prevNode = freeNode;
             freeLists->nextNode = freeNode;
-            // 주소값 대입 이후 주소 참조 후 이후 주소의 이전 주소에 freeNode 대입
             return;
         }
 
@@ -104,12 +105,50 @@ void addFreeNode(ST_FREELIST* freeNode)
 
 void coalescing(void * p)
 {
+    if(init == 0){
+        freeLists = p-4;
+        debug("first Lists debug(%p)\n",freeLists);
+        int*temp = p-4;
+        *temp -=1;
+        debug("init debug(%d)\n",*temp);
+        freeLists = (ST_FREELIST*)p;
+        freeLists->nextNode = NULL;
+        freeLists->prevNode = NULL;
+        init = 1;
+        return;
+    }
+    debug("coalescing\n");  
+    debug("debug(%p)\n",p);      
     ST_FREELIST* tempPtr = (ST_FREELIST*)p;
+    
     ST_FREELIST * current = p-4;
-    ST_FREELIST * prev = current-4; //HEADERLENGTH
+    ST_FREELIST * prev = p-8; //HEADERLENGTH
     ST_FREELIST * next = current+(current->size&-2);
-    size_t nextAllocatedFlag = next->size&=1;
+    size_t nextAllocatedFlag = 0;
+    if(sbrk(0)<next)
+    {
+        nextAllocatedFlag = 1;
+    }
+    else
+    {
+        nextAllocatedFlag = next->size&=1;
+    }
+    debug("coalescing debug(%d)\n",current->size);
+    debug("coalescing debug(%p)\n",p);
+    debug("coalescing debug(%p)\n",current);
+    debug("coalescing debug(%p)\n",prev);
+    debug("coalescing debug(%p)\n",next);  
+
     size_t prevAllocatedFlag = prev->size&=1;
+
+    debug("current size(%d)\n",current->size);
+    debug("current nextNode(%p)\n",current->nextNode);
+    debug("current prevNode(%p)\n",current->prevNode);
+    debug("prev size(%d)\n",prev->size);
+    debug("next size(%d)\n",next->size);
+    debug("nextAllocatedFlag size(%d)\n",nextAllocatedFlag);
+    debug("prevAllocatoedFlag size(%d)\n",prevAllocatedFlag);    
+    
     if( nextAllocatedFlag== 0){
         current->nextNode = next->nextNode;
         current->prevNode = next->prevNode;
@@ -132,14 +171,31 @@ void coalescing(void * p)
 
 
 }
+typedef struct size
+{
+    size_t s;
+}SIZE;
 
 void* allocateFreeList(size_t blockSize)
 {
-
+    debug("allocateFreeList\n");
     //allocate할때 sbrk 혹은 freenode에서 추가 
     //
-    if(freeLists->size == 0)
-        return sbrk(blockSize);
+    if(init == 0){
+        void* p = sbrk(blockSize);
+        debug("header debug(%p)\n",p);
+        debug("blockSize(%d)\n",blockSize);
+        SIZE* t = p;
+        t->s = blockSize+1;
+        debug("debug(%p)\n",&t->s);
+        t = p+blockSize-4;
+
+        debug("foot debug(%p)\n",t);
+        t->s = blockSize+1;
+        debug("debug(%p)\n",&t->s);
+        return p+4;
+
+    }
 
     ST_FREELIST* current = freeLists;
 
@@ -181,37 +237,23 @@ void* allocateFreeList(size_t blockSize)
 
 }
 
-void allocatorInit()
-{
 
-    
-    init = 1;
-
-    freeLists = sbrk(20);    
-    freeLists->nextNode = NULL;
-    freeLists->prevNode = NULL;
-    freeLists->size = 0; 
-    
-}
 
 void *myalloc(size_t size)
 {
     if (size == 0)
         return 0;
 
-    if(init == 0)
-        allocatorInit();
-                
+ 
     size_t blockSize = size * BLOCKSIZE;
     blockSize += 8;
 
     //freeList에서 확인 이후 없으면 sbrk 확인은 어떻게?
-    void *p = allocateFreeList(size);
+    void *p = allocateFreeList(blockSize);
 
 
     int * memSize = p;
-    *memSize = blockSize;
-    debug("alloc(%u): %p\n", (unsigned int)size, p+BLOCKSIZE);
+    debug("alloc(%u): %p\n", (unsigned int)size, p);
     max_size += size;
     debug("max: %u\n", max_size);
 
@@ -235,7 +277,6 @@ void *myrealloc(void *ptr, size_t size)
 
 void myfree(void *ptr)
 {
-    coalescing(ptr);
-
-    debug("free(%p)\n", ptr);
+    debug("free(%p)\n", ptr);    
+    coalescing(ptr);    
 }
