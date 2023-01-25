@@ -86,7 +86,13 @@ void addFreeNode(ST_FREELIST* freeNode)
 
         if(currentNode->nextNode == NULL || currentNode->nextNode < initAddress)
         {   
+            freeNode->size -= 1;
+            u_int32_t tempSize = (freeNode->size>>1) - 4;
+            char * tempAdd = freeNode;
+            tempAdd += tempSize;
+            SIZE * footer = tempAdd;
 
+            footer->s = freeNode->size;
             freeNode->prevNode = currentNode;
             currentNode->nextNode = freeNode;
             freeNode->nextNode = NULL;
@@ -96,11 +102,16 @@ void addFreeNode(ST_FREELIST* freeNode)
         
         if(freeNode < currentNode)
         {   
+            freeNode->size -= 1;
+            u_int32_t tempSize = (freeNode->size<<1) - 4;
+            char * tempAdd = freeNode;
+            tempAdd += tempSize;
+            SIZE * footer = tempAdd;
 
+
+            footer->s = freeNode->size;
             freeNode->nextNode = currentNode;
-              
             freeNode->prevNode = currentNode->prevNode;
-            
             currentNode->prevNode = freeNode;
 
             
@@ -198,13 +209,13 @@ void coalescing(void * p)
     }
     else
     {
-        
-
+        debug("debug %p\n",current);   
+        debug("debug %p\n",prev);   
         SIZE * prevSize = (SIZE*)prev;
         prevAllocatedFlag = prev->size&1;        
         u_int32_t prevS = (prevSize->s>>1); 
         prev = (void*)prev-(void*)(prevS-BLOCKSIZE);
-        
+        debug("prevSize %d\n\n",prevS);
 
     }
         debug("nextAllocatedFlag %p \n",nextAllocatedFlag);
@@ -228,10 +239,12 @@ void coalescing(void * p)
             debug("current %p\n",current);
             debug("current->size %d\n",current->size>>1);
             debug("current->prevNode %p\n",current->prevNode);
+            debug("current->prevNode->nextNode %p\n",current->prevNode->nextNode);
             current->prevNode->nextNode = current; 
+            
         }
         
-    
+        
                
         current->size = (current->size>>1) + (nextSize);
         
@@ -249,26 +262,30 @@ void coalescing(void * p)
         // debug("footer po %p\n",footer);
         
         footer->s = current->size;
+        
         moveRoot(current);
+        
     }
     
 
     if( prevAllocatedFlag== 0)
     {   
-
+        debug("debug %p\n",prev);
+   
+        debug("heapAddr %p\n",heapAddress);
         prev->size =  (current->size>>1) + (prev->size>>1);
-
+        debug("debug %p\n",prev->size);  
   
         u_int32_t* newCurrent = prev; 
         u_int32_t s = (prev->size>>1);
         newCurrent += (s/4)-1;     
         SIZE* footer = newCurrent;
         
-    debug("debug\n");
-
-        footer->s = (prev->size>>1);
-
   
+  
+        footer->s = (prev->size>>1);
+ 
+
         moveRoot(prev);
     }
     
@@ -297,12 +314,12 @@ void* allocateFreeList(size_t blockSize)
         heapAddress = p+blockSize;
         SIZE* t = p;
         t->s = (blockSize<<1)+1;
-
+    
         t = p+blockSize-BLOCKSIZE;
 
 
         t->s = (blockSize<<1)+1;
-
+        
         return p+BLOCKSIZE;
 
     }
@@ -316,7 +333,7 @@ void* allocateFreeList(size_t blockSize)
         debug("debug cSize %d \n",cSize);
         if((int)blockSize < cSize-24)
         {
-            
+
             
             ST_FREELIST* tempPrev = current->prevNode;
 
@@ -327,14 +344,16 @@ void* allocateFreeList(size_t blockSize)
 
             u_int32_t* temp = current;
             debug("cur size %d\n",current->size);
-            debug("temp size %d\n",tempSize);     
+            
             *temp = (blockSize<<1)+1;
                    
             char * tempAdd = temp;
 
-            tempAdd+= (blockSize);
+            tempAdd+= (blockSize)-BLOCKSIZE;
 
             temp = tempAdd;   
+                        debug("curent %p\n",current);
+            debug("temp %p\n",temp);
             // debug("c a %p\n",current);     
             debug("c s %d\n",cSize);     
             debug("b s %d\n",blockSize);     
@@ -345,19 +364,19 @@ void* allocateFreeList(size_t blockSize)
             *temp = (blockSize<<1)+1;
 
             u_int32_t * tempType = temp;
-            
-            debug("tempType %p\n",tempAdd);      
+
             ST_FREELIST* freeNode = tempType+1;
             freeNode->prevNode = tempPrev;
             
- 
+
             freeNode->nextNode = tempNext;
+
+     
             
             freeNode->size = (tempSize<<1);
             
             void * returnAddress = current;
-        
-        
+
             if(tempPrev != NULL){
                 
                 tempPrev->nextNode = freeNode;
@@ -370,7 +389,8 @@ void* allocateFreeList(size_t blockSize)
                 tempNext->prevNode = freeNode;
 
             }
-            
+       
+            debug("freeNode %p\n",freeNode);
             u_int32_t *footerTemp = freeNode;
             SIZE* freeNodeFooter = footerTemp+((tempSize>>1)/4)-1;
             // debug("heapAddress %p\n",heapAddress);
@@ -380,7 +400,7 @@ void* allocateFreeList(size_t blockSize)
             // debug("debug tempSize %d \n",tempSize);
             freeNodeFooter->s = (tempSize>>1);
             
-            
+            debug("freeNodeFooter %p\n",freeNodeFooter);
 
             moveRoot(freeNode);
             
@@ -464,16 +484,17 @@ void *myalloc(size_t size)
     {   
         
         initAddress = sbrk(0);
-        debugPointer = initAddress + 37848;
-        // debug("debugPointer(%p)\n",debugPointer);
-        // debug("initAdd(%p)\n",initAddress);  
+        debugPointer = initAddress + 18388;
+        debug("debugPointer(%p)\n",debugPointer);
+        debug("initAdd(%p)\n",initAddress);  
         checkAddress = 1;
     }    
 
-    // if(debugPointer < heapAddress){
-    //     debug("fuckyou 1 %p\n",debugPointer);
-    //     debug("fuckyou 2 %x\n",debugPointer->s);
-    // }
+    if(debugPointer < heapAddress){
+        debug("heap %p\n",heapAddress);
+        debug("fuckyou 1 %p\n",debugPointer);
+        debug("fuckyou 2 %d\n",debugPointer->s);
+    }
     size_t  blockSize = 0;
     if(size < 16){
         blockSize = 16;
@@ -550,10 +571,11 @@ void *myrealloc(void *ptr, size_t size)
 void myfree(void *ptr)
 {
     debug("free strat (%p)\n", ptr);      
-    //    if(debugPointer < heapAddress){
-    //     debug("fuckyou 1 %p\n",debugPointer);
-    //     debug("fuckyou 2 %d\n",debugPointer->s);
-    // }  
+       if(debugPointer < heapAddress){
+        debug("heap %p\n",heapAddress);
+        debug("fuckyou 1 %p\n",debugPointer);
+        debug("fuckyou 2 %d\n",debugPointer->s);
+    }  
     // if (freeLists != NULL)
     // {
     
