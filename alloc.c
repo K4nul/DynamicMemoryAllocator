@@ -5,6 +5,7 @@
 
 #define BLOCKSIZE 8
 
+
 typedef struct freeList
 {
     size_t size;
@@ -84,7 +85,7 @@ void addFreeNode(ST_FREELIST* freeNode)
     }
     
 }
-
+// moveRoot 방식 변경 
 void moveRoot(ST_FREELIST * current){
     
     while(1)
@@ -110,8 +111,6 @@ void moveRoot(ST_FREELIST * current){
 void coalescing(void * p)
 {
     
-    
- 
     if(init == 0){
 
         freeLists = p-BLOCKSIZE;
@@ -201,7 +200,7 @@ void coalescing(void * p)
         char* newCurrent = current;      
         size_t s = current->size;
         current->size = (current->size<<1);
-        newCurrent += s-8;//수상
+        newCurrent += s-8;
 
         SIZE* footer = newCurrent;
 
@@ -230,7 +229,7 @@ void coalescing(void * p)
         prevTemp += (s-BLOCKSIZE);
         
         SIZE* footer = prevTemp;     
-        footer->s = (prev->size<<1); // 오류 부분
+        footer->s = (prev->size<<1); 
         prev->size = (prev->size<<1);
         moveRoot(prev);
     }
@@ -249,7 +248,6 @@ void coalescing(void * p)
 
 
 }
-
 
 void* allocateFreeList(size_t blockSize)  
 {
