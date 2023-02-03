@@ -31,13 +31,13 @@ unsigned int max_size;
 /***
  * Prototype 1 : seglist 32 ~ 2^25구조체 구현 및 저장 
  * Prototype 2 : seglist 구조체 범위 저장 
- * Prototype 3 : 구조체 split 및 이동 구현 
+ * Prototype 3 : 구조체 split 및 이동 구현 V
  * Prototype 4 : coalescing 구현 
  *  
 ***/
 
 
-// void coalescing(void * p)
+// void coalescing(void * p) //coalescing 구현
 // {
     
 //     if(init == 0){
@@ -205,6 +205,24 @@ void tempFree(void * p)
     ST_FREELIST* temp = seglist[i];
     temp->nextNode = realPoint;
 }
+// 32 0 
+// 64 1
+// 128 2
+// 256 3
+// 512 4
+// 1024 5
+// 2048 6
+// 4096 7
+// 8192 8
+// 16384 9
+// 32768 10
+// 65536 11
+// 131072 12
+// 262144 13 
+// 524288 14
+// 1048576 15 
+// 2097152 16 
+// 4194304 17 
 
 void* allocateFreeList(size_t blockSize)  
 {
@@ -216,28 +234,28 @@ void* allocateFreeList(size_t blockSize)
         initSize <<= 1;            
             
     }
+    blockSize&32;
     void * p;
     ST_FREELIST* current = seglist[i];
     ST_FREELIST* prev = NULL;
+    debug("init : %d\n",initSize);
+    debug("bloc : %d\n",blockSize);
     while(1){
         if(current == NULL)
         {
-            
+            debug("1\n");
             p = sbrk(blockSize);
 
             heapAddress = p+blockSize;
             SIZE* t = p;
             t->s = (blockSize<<1)+1;
-    
             t = p+blockSize-BLOCKSIZE;
-
-
             t->s = (blockSize<<1)+1;
-        
-            return p+BLOCKSIZE;        
+            break;
         }
         if(blockSize == (current->size>>1))
         {
+            debug("2\n");
             p = current;
             if(current->nextNode == NULL){
                 if(prev == NULL){
@@ -252,21 +270,76 @@ void* allocateFreeList(size_t blockSize)
                 else
                     prev->nextNode = current->nextNode;
             }    
-            return p+BLOCKSIZE;
-            break;
-        }
-        if(blockSize < (current->size>>1)-32)
-        {
-            //split 구현 및 seglist에 저장 
+            
             break;
         }
 
+        if((int)blockSize < (int)(current->size>>1)-32)
+        {
+            
+            //split 구현 및 seglist에 저장 
+            p = current;
+            debug("debug curr %p\n",current);
+            debug("debug size %d\n",current->size);
+            if(current->nextNode == NULL){
+                if(prev == NULL){
+                    seglist[i] = NULL;
+                }
+                else
+                    prev->nextNode = NULL;
+            }
+            else{
+                if(prev == NULL)
+                    seglist[i] = current->nextNode;
+                else
+                    prev->nextNode = current->nextNode;
+            }      
+                      
+            SIZE* t = p;
+            t->s = (blockSize<<1)+1;
+            
+            t = p+blockSize-BLOCKSIZE;
+            debug("heap point %p\n",heapAddress);
+            debug("debug point %p\n",t);
+            t->s = (blockSize<<1)+1;
+            
+            size_t freeNodeSize = (current->size>>1) - blockSize;
+            
+            ST_FREELIST* freeNode = p+blockSize;
+            freeNode->size = (freeNodeSize<<1);
+            freeNode = p+blockSize+freeNodeSize-BLOCKSIZE;
+            freeNode->size = (freeNodeSize<<1);
+            
+            int x;
+            size_t is = 32;
+            for(x = 0; x <LIMITSIZE; x ++)
+            {
+                if( is <= blockSize && blockSize < is<<1)
+                    break;
+                is <<=1;
+            }
+            freeNode->nextNode = seglist[x];
+            seglist[x] = freeNode;
+
+                  
+            // Error current 삭제로 이전노드 연결 
+            // 새 프리노드 크기에 맞는 노드로 이전 
+            
+            // debug("2 current -> size %d\n",current->size>>1);
+            // debug("2 blockSize %d\n",blockSize);
+            // debug("freeNode  %p \n",freeNode);
+            // debug("current  %p \n",current);
+            break;
+
+        }
+        // debug("prev  %p \n",prev);
+        // debug("current  %p \n",current);
         prev = current; 
         current = current->nextNode; 
         
     }
  
-
+    return p+BLOCKSIZE;
 
 }
 
@@ -280,14 +353,22 @@ void seglistInit(){
 
 void *myalloc(size_t size)
 {
-     
+    // for(int i = 0; i < LIMITSIZE; i++){
+    //     debug("seglist %d : %p\n",i,seglist[i]);       
+    // }          
+       if(debugPointer < heapAddress){
+        debug("heap %p\n",heapAddress);
+        debug("fuckyou 1 %p\n",debugPointer);
+        debug("fuckyou 2 %d\n",debugPointer->size);
+        debug("fuckyou 3 %p\n",debugPointer->nextNode);
+    }
     debug("alloc start\n");
     if (size == 0)
         return 0;
     if(checkAddress == 0)
     {   
         initAddress = sbrk(0);
-        debugPointer = initAddress + 568;
+        debugPointer = initAddress + 85135;
         debug("debugPointer(%p)\n",debugPointer);
         debug("initAdd(%p)\n",initAddress);  
         checkAddress = 1;
@@ -337,6 +418,16 @@ void *myrealloc(void *ptr, size_t size)
 
 void myfree(void *ptr)
 {
+    // for(int i = 0; i < LIMITSIZE; i++){
+    //     debug("seglist %d : %p\n",i,seglist[i]);       
+    // }   
+   
+    if(debugPointer < heapAddress){
+        debug("heap %p\n",heapAddress);
+        debug("fuckyou 1 %p\n",debugPointer);
+        debug("fuckyou 2 %d\n",debugPointer->size);
+        debug("fuckyou 3 %p\n",debugPointer->nextNode);
+    }   
 
     if(ptr < initAddress ){
         return;
