@@ -10,6 +10,7 @@ typedef struct freeList
 {
     size_t size;
     struct freeList* nextNode;
+    struct freeList* prevNode;
 } ST_FREELIST;
 typedef struct size
 {
@@ -27,15 +28,13 @@ extern void debug(const char *fmt, ...);
 extern void *sbrk(intptr_t increment);
 
 unsigned int max_size;
-
-
-
-void addFreeNode(ST_FREELIST* freeNode)
-{
-
-
-    
-}
+/***
+ * Prototype 1 : seglist 32 ~ 2^25구조체 구현 및 저장 
+ * Prototype 2 : seglist 구조체 범위 저장 
+ * Prototype 3 : 구조체 split 및 이동 구현 
+ * Prototype 4 : coalescing 구현 
+ *  
+***/
 
 
 // void coalescing(void * p)
@@ -181,10 +180,8 @@ void addFreeNode(ST_FREELIST* freeNode)
 //         }
 //     }
 
-
-
-
 // }
+
 void tempFree(void * p)
 {
     ST_FREELIST * realPoint = p-BLOCKSIZE;
@@ -194,7 +191,7 @@ void tempFree(void * p)
     size_t blockSize = realPoint->size>>1;
     for(i = 0; i <LIMITSIZE; i ++)
     {
-        if( blockSize<= initSize)
+        if( initSize <= blockSize && blockSize < initSize<<1)
             break;
         initSize <<=1;
     }
@@ -214,42 +211,61 @@ void* allocateFreeList(size_t blockSize)
     size_t initSize = 32;
     int i;
     for(i = 0; i < LIMITSIZE; i++){
-        if(blockSize<=initSize)
+        if(initSize <= blockSize && blockSize < initSize<<1)
             break;    
         initSize <<= 1;            
             
     }
-    debug("initSize:%d\n",initSize);
-    debug("blockSize:%d\n",blockSize);
     void * p;
-    if(seglist[i] == NULL){
-        p = sbrk(initSize);
+    ST_FREELIST* current = seglist[i];
+    ST_FREELIST* prev = NULL;
+    while(1){
+        if(current == NULL)
+        {
+            
+            p = sbrk(blockSize);
 
-        heapAddress = p+initSize;
-        SIZE* t = p;
-        t->s = (initSize<<1)+1;
+            heapAddress = p+blockSize;
+            SIZE* t = p;
+            t->s = (blockSize<<1)+1;
     
-        t = p+initSize-BLOCKSIZE;
+            t = p+blockSize-BLOCKSIZE;
 
 
-        t->s = (initSize<<1)+1;
+            t->s = (blockSize<<1)+1;
         
-        return p+BLOCKSIZE;
+            return p+BLOCKSIZE;        
+        }
+        if(blockSize == (current->size>>1))
+        {
+            p = current;
+            if(current->nextNode == NULL){
+                if(prev == NULL){
+                    seglist[i] = NULL;
+                }
+                else
+                    prev->nextNode = NULL;
+            }
+            else{
+                if(prev == NULL)
+                    seglist[i] = current->nextNode;
+                else
+                    prev->nextNode = current->nextNode;
+            }    
+            return p+BLOCKSIZE;
+            break;
+        }
+        if(blockSize < (current->size>>1)-32)
+        {
+            //split 구현 및 seglist에 저장 
+            break;
+        }
 
-    };
-    
-    ST_FREELIST* temp = seglist[i];
-    
-    p = seglist[i];
-    debug("temp->nextNode %p\n",temp);
-    
-    if(temp->nextNode == NULL)
-        seglist[i] = NULL;
-    else
-        seglist[i] = temp->nextNode;
+        prev = current; 
+        current = current->nextNode; 
         
-    return p+BLOCKSIZE;
-    //할당
+    }
+ 
 
 
 }
@@ -264,27 +280,19 @@ void seglistInit(){
 
 void *myalloc(size_t size)
 {
-    
-    for(int i = 0; i < LIMITSIZE; i++){
-        debug("seglist %d : %p\n",i,seglist[i]);       
-    }    
+     
     debug("alloc start\n");
     if (size == 0)
         return 0;
     if(checkAddress == 0)
     {   
         initAddress = sbrk(0);
-        debugPointer = initAddress + 1280;
+        debugPointer = initAddress + 568;
         debug("debugPointer(%p)\n",debugPointer);
         debug("initAdd(%p)\n",initAddress);  
         checkAddress = 1;
     }  
-    // if(debugPointer < heapAddress){
-    //     debug("heap %p\n",heapAddress);
-    //     debug("fuckyou 1 %p\n",debugPointer);
-    //     debug("fuckyou 2 %d\n",debugPointer->size);
-    //     debug("fuckyou 3 %p\n",debugPointer->nextNode);
-    // } 
+
     if(init == 0){
         seglistInit();
         init = 1;
@@ -313,8 +321,13 @@ void *myrealloc(void *ptr, size_t size)
     debug("realloc Start (%p)\n",ptr);
     void *p = NULL;
     myfree(ptr);
-    size_t blockSize = size;
-    blockSize += 16;   
+    size_t  blockSize = 0;
+    if(size < 16){
+        blockSize = 16;
+    }else{
+        blockSize = size;
+    }
+    blockSize += 16;       
     p = allocateFreeList(blockSize);
     debug("realloc size(%d) %p\n ",size,p);
     
@@ -324,17 +337,7 @@ void *myrealloc(void *ptr, size_t size)
 
 void myfree(void *ptr)
 {
-    // if(debugPointer < heapAddress){
-    //     debug("heap %p\n",heapAddress);
-    //     debug("fuckyou 1 %p\n",debugPointer);
-    //     debug("fuckyou 2 %d\n",debugPointer->size);
-    //     debug("fuckyou 3 %p\n",debugPointer->nextNode);
-    // }    
 
-    debug("free start\n");
-    for(int i = 0; i < LIMITSIZE; i++){
-        debug("seglist %d : %p\n",i,seglist[i]);       
-    }
     if(ptr < initAddress ){
         return;
     }
@@ -343,8 +346,7 @@ void myfree(void *ptr)
     }    
 
     tempFree(ptr);
-    debug("free %p \n",ptr);
-    // coalescing(ptr);      
+    debug("free %p \n",ptr);    
 
 
 }
