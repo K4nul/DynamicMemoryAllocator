@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define BLOCKSIZE 4
-#define LIMITSIZE 16
+#define LIMITSIZE 20
 #define DOUBLE(X) X<<=1 
 #define SIZEINPUT(X,Y,Z) X=(Y<<1)+Z
 #define MOVEPOINTER(P,X,Y) (P)=(X)+(Y) 
@@ -127,7 +127,7 @@ void *myalloc(u_int32_t size)
         blockSize = size;
     }
 
-    blockSize +=  BLOCKSIZE;
+    blockSize +=  BLOCKSIZE*2;
 
     void *p = allocateFreeList(blockSize);
 
