@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define BLOCKSIZE 4
-#define LIMITSIZE 20
+#define LIMITSIZE 16
 #define DOUBLE(X) X<<=1 
 #define SIZEINPUT(X,Y,Z) X=(Y<<1)+Z
 #define MOVEPOINTER(P,X,Y) (P)=(X)+(Y) 
@@ -22,11 +22,14 @@ typedef struct size
 
 }SIZE;
 
+int initFlag = 0;
 void *seglist[LIMITSIZE];
 
 static ST_FREELIST* debugPointer = NULL;
 extern void debug(const char *fmt, ...);
 extern void *sbrk(intptr_t increment);
+
+
 
 unsigned int max_size;
 
@@ -105,6 +108,7 @@ void* allocateFreeList(u_int32_t blockSize)
 
 void *myalloc(u_int32_t size)
 {
+    
     
     // for(int i = 0; i < LIMITSIZE; i++)
     // {
