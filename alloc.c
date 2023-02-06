@@ -40,7 +40,7 @@ void tempFree(void * p)
     
     for(i = 0; i <LIMITSIZE; i ++)
     {
-        if(initSize <= blockSize && blockSize < initSize<<1)
+        if(blockSize<=initSize)
             break;
         DOUBLE(initSize);
     }
@@ -66,7 +66,7 @@ void* allocateFreeList(u_int32_t blockSize)
 
     for(i = 0; i < LIMITSIZE; i++)
     {
-        if(initSize <= blockSize && blockSize < initSize<<1)
+        if(blockSize<=initSize)
             break;    
         DOUBLE(initSize);         
             
@@ -76,12 +76,12 @@ void* allocateFreeList(u_int32_t blockSize)
     
     if(seglist[i] == NULL)
     {
-        p = sbrk(blockSize);
+        p = sbrk(initSize);
 
         SIZE* t = p;
-        SIZEINPUT(t->s,blockSize,1);
-        MOVEPOINTER(t,p,blockSize-BLOCKSIZE);
-        SIZEINPUT(t->s,blockSize,1);
+        SIZEINPUT(t->s,initSize,1);
+        MOVEPOINTER(t,p,initSize-BLOCKSIZE);
+        SIZEINPUT(t->s,initSize,1);
         
         return p+BLOCKSIZE;
 
