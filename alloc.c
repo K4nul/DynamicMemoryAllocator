@@ -16,15 +16,14 @@ typedef struct freeList
     struct freeList* nextNode;
 
 } ST_FREELIST;
+
 typedef struct size
 {
     u_int32_t s;
 
 }SIZE;
 
-int initFlag = 0;
 void *seglist[LIMITSIZE];
-
 static ST_FREELIST* debugPointer = NULL;
 extern void debug(const char *fmt, ...);
 extern void *sbrk(intptr_t increment);
@@ -66,41 +65,42 @@ void* allocateFreeList(u_int32_t blockSize)
 {
     u_int32_t initSize = INITSIZE;
     int i=0;
-
+    void * p; 
     for(i = 0; i < LIMITSIZE; i++)
     {
         if(blockSize<=initSize)
-            break;    
+        {
+            if(seglist[i] == NULL)
+                break;
+
+               
+            ST_FREELIST* temp = seglist[i];
+    
+            p = seglist[i];
+    
+            if(temp->nextNode == NULL)
+                seglist[i] = NULL;
+            else
+                seglist[i] = temp->nextNode;
+        
+            return p+BLOCKSIZE;
+            
+        }
         DOUBLE(initSize);         
             
     }
 
-    void * p;
-    
-    if(seglist[i] == NULL)
-    {
-        p = sbrk(initSize);
 
-        SIZE* t = p;
-        SIZEINPUT(t->s,initSize,1);
-        MOVEPOINTER(t,p,initSize-BLOCKSIZE);
-        SIZEINPUT(t->s,initSize,1);
-        
-        return p+BLOCKSIZE;
+    p = sbrk(initSize);
 
-    };
-    
-    ST_FREELIST* temp = seglist[i];
-    
-    p = seglist[i];
-    
-    if(temp->nextNode == NULL)
-        seglist[i] = NULL;
-    else
-        seglist[i] = temp->nextNode;
+    SIZE* t = p;
+    SIZEINPUT(t->s,initSize,1);
+    MOVEPOINTER(t,p,initSize-BLOCKSIZE);
+    SIZEINPUT(t->s,initSize,1);
         
     return p+BLOCKSIZE;
-    //할당
+
+
 
 
 }
@@ -108,12 +108,12 @@ void* allocateFreeList(u_int32_t blockSize)
 
 void *myalloc(u_int32_t size)
 {
+
     
-    
-    // for(int i = 0; i < LIMITSIZE; i++)
-    // {
-    //     debug("seglist %d : %p\n",i,seglist[i]);       
-    // }    
+    for(int i = 0; i < LIMITSIZE; i++)
+    {
+        debug("seglist %d : %p\n",i,seglist[i]);       
+    }    
     debug("alloc start\n");
     if (size == 0)
         return 0;
